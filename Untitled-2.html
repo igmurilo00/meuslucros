@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Controle de Motoboy - Ganhos e Gastos</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #f9fafb;
+      --primary: #2563eb;
+      --accent: #1e40af;
+      --light: #ffffff;
+      --dark: #1f2937;
+      --success: #16a34a;
+      --danger: #dc2626;
+    }
+    body.dark {
+      --bg: #1f2937;
+      --light: #111827;
+      --dark: #f9fafb;
+    }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg);
+      color: var(--dark);
+      padding: 20px;
+      transition: background 0.3s, color 0.3s;
+    }
+    .app {
+      max-width: 500px;
+      margin: auto;
+    }
+    .theme-toggle {
+      text-align: right;
+      margin-bottom: 10px;
+    }
+    .theme-toggle button {
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      cursor: pointer;
+    }
+    h1 {
+      text-align: center;
+      font-size: 2rem;
+      color: var(--primary);
+      margin-bottom: 24px;
+      animation: fadeIn 1s ease-in-out;
+    }
+    .card {
+      background: var(--light);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+      margin-bottom: 24px;
+      transition: transform 0.3s;
+    }
+    .card:hover {
+      transform: translateY(-3px);
+    }
+    .card h2 {
+      font-size: 1.25rem;
+      margin-bottom: 16px;
+      color: var(--accent);
+    }
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    input, select, button {
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
+      font-size: 1rem;
+      outline: none;
+    }
+    input:focus, select:focus {
+      border-color: var(--primary);
+    }
+    button {
+      background: var(--primary);
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:hover {
+      background: var(--accent);
+    }
+    .list {
+      margin-top: 12px;
+    }
+    .item {
+      background: #f1f5f9;
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    body.dark .item {
+      background: #374151;
+    }
+    .item .info span {
+      display: block;
+    }
+    .item .value {
+      font-weight: bold;
+    }
+    .item button {
+      background: var(--danger);
+      color: white;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+    .summary {
+      text-align: center;
+      font-weight: 600;
+      margin-top: 10px;
+      font-size: 1rem;
+    }
+    canvas {
+      max-width: 100%;
+      margin-top: 20px;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="theme-toggle">
+      <button onclick="toggleTheme()" id="themeBtn">🌙</button>
+    </div>
+
+    <h1>📱 Controle de Motoboy 🛵</h1>
+
+    <div class="card">
+      <h2>Registrar Transação</h2>
+      <div class="input-group">
+        <input id="descricao" type="text" placeholder="Descrição (ex: entrega, gasolina)">
+        <input id="valor" type="number" placeholder="Valor R$" step="0.01">
+        <select id="tipo">
+          <option value="ganho">Ganho 🟢</option>
+          <option value="gasto">Gasto 🔴</option>
+        </select>
+        <select id="categoria">
+          <option value="semana">Semana</option>
+          <option value="mes">Mês</option>
+        </select>
+        <select id="dia">
+          <option>Segunda-feira</option>
+          <option>Terça-feira</option>
+          <option>Quarta-feira</option>
+          <option>Quinta-feira</option>
+          <option>Sexta-feira</option>
+          <option>Sábado</option>
+          <option>Domingo</option>
+        </select>
+        <button onclick="adicionarRegistro()">+ Adicionar</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Resumo Semanal</h2>
+      <div id="lista-semana" class="list"></div>
+      <div class="summary" id="resumo-semana"></div>
+    </div>
+
+    <div class="card">
+      <h2>Resumo Mensal</h2>
+      <div id="lista-mes" class="list"></div>
+      <div class="summary" id="resumo-mes"></div>
+    </div>
+
+    <div class="card">
+      <h2>Gráficos</h2>
+      <canvas id="graficoPizza"></canvas>
+      <canvas id="graficoBarra"></canvas>
+    </div>
+  </div>
+
+  <script>
+    let registros = JSON.parse(localStorage.getItem('registrosMotoboy') || '[]');
+    let graficoPizza, graficoBarra;
+
+    function salvarLocal() {
+      localStorage.setItem('registrosMotoboy', JSON.stringify(registros));
+    }
+
+    function adicionarRegistro() {
+      const descricao = document.getElementById('descricao').value.trim();
+      const valor = parseFloat(document.getElementById('valor').value);
+      const tipo = document.getElementById('tipo').value;
+      const categoria = document.getElementById('categoria').value;
+      const dia = document.getElementById('dia').value;
+
+      if (!descricao || isNaN(valor) || valor <= 0) {
+        alert('Preencha todos os campos corretamente.');
+        return;
+      }
+
+      registros.push({ descricao, valor, tipo, categoria, dia });
+      document.getElementById('descricao').value = '';
+      document.getElementById('valor').value = '';
+      salvarLocal();
+      renderizar();
+    }
+
+    function remover(index) {
+      registros.splice(index, 1);
+      salvarLocal();
+      renderizar();
+    }
+
+    function renderizar() {
+      const semana = document.getElementById('lista-semana');
+      const mes = document.getElementById('lista-mes');
+      semana.innerHTML = '';
+      mes.innerHTML = '';
+
+      let totalSemana = 0;
+      let totalMes = 0;
+      let ganhoTotal = 0;
+      let gastoTotal = 0;
+
+      registros.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'item';
+        const valorFormatado = `${item.tipo === 'ganho' ? '+' : '-'} R$ ${item.valor.toFixed(2)}`;
+        const info = `<div class="info">
+          <span>${item.dia} - ${item.descricao}</span>
+          <span class="value">${valorFormatado}</span>
+        </div>`;
+        div.innerHTML = info + `<button onclick="remover(${index})">Excluir</button>`;
+
+        if (item.categoria === 'semana') {
+          semana.appendChild(div);
+          totalSemana += item.tipo === 'ganho' ? item.valor : -item.valor;
+        } else {
+          mes.appendChild(div);
+          totalMes += item.tipo === 'ganho' ? item.valor : -item.valor;
+        }
+
+        if (item.tipo === 'ganho') ganhoTotal += item.valor;
+        if (item.tipo === 'gasto') gastoTotal += item.valor;
+      });
+
+      document.getElementById('resumo-semana').textContent = `Lucro líquido: R$ ${totalSemana.toFixed(2)}`;
+      document.getElementById('resumo-mes').textContent = `Lucro líquido: R$ ${totalMes.toFixed(2)}`;
+
+      atualizarGraficos(ganhoTotal, gastoTotal, totalSemana, totalMes);
+    }
+
+    function atualizarGraficos(ganho, gasto, semana, mes) {
+      const ctxPizza = document.getElementById('graficoPizza').getContext('2d');
+      const ctxBarra = document.getElementById('graficoBarra').getContext('2d');
+      if (graficoPizza) graficoPizza.destroy();
+      if (graficoBarra) graficoBarra.destroy();
+
+      graficoPizza = new Chart(ctxPizza, {
+        type: 'doughnut',
+        data: {
+          labels: ['Ganhos', 'Gastos'],
+          datasets: [{
+            data: [ganho, gasto],
+            backgroundColor: ['#16a34a', '#dc2626'],
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { position: 'bottom' } }
+        }
+      });
+
+      graficoBarra = new Chart(ctxBarra, {
+        type: 'bar',
+        data: {
+          labels: ['Semana', 'Mês'],
+          datasets: [{
+            label: 'Lucro Líquido',
+            data: [semana, mes],
+            backgroundColor: '#2563eb'
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: { beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    function toggleTheme() {
+      const body = document.body;
+      body.classList.toggle('dark');
+      localStorage.setItem('temaMotoboy', body.classList.contains('dark') ? 'dark' : 'light');
+      document.getElementById('themeBtn').textContent = body.classList.contains('dark') ? '🌞' : '🌙';
+    }
+
+    (function () {
+      const temaSalvo = localStorage.getItem('temaMotoboy');
+      if (temaSalvo === 'dark') {
+        document.body.classList.add('dark');
+        document.getElementById('themeBtn').textContent = '🌞';
+      }
+      renderizar();
+    })();
+  </script>
+</body>
+</html>
